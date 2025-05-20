@@ -9,6 +9,7 @@ module "compute" {
   environment  = var.environment
   vpc_id       = module.network.vpc_id
   subnet_ids   = module.network.public_subnet_ids
-  ami_id       = "ami-0c7217cdde317cfec" # example AMI
-  instance_type = "t3.micro"
+  ami_id         = var.ami_id
+  instance_type  = var.instance_type
+  user_data_file = "${path.module}/setup.sh"
 }
