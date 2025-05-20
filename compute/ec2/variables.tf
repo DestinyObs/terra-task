@@ -29,3 +29,8 @@ variable "instance_type" {
   type        = string
   default     = "t2.micro"
 }
+
+variable "user_data_file" {
+  type    = string
+  default = null
+}

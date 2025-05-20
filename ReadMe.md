@@ -43,9 +43,7 @@ The directory structure is designed to isolate concerns and maximize reusability
 │       ├── backend.tf
 │       ├── terraform.tfvars
 │       └── backend.tfvars
-├── main.tf
-├── providers.tf
-└── backend.tf
+
 ```
 
 ---
