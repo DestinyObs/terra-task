@@ -30,7 +30,7 @@ variable "instance_type" {
   default     = "t2.micro"
 }
 
-variable "user_data_file" {
-  type    = string
-  default = null
-}
+# variable "user_data_file" {
+#   type    = string
+#   default = null
+# }

@@ -4,7 +4,7 @@ resource "tls_private_key" "ec2_key" {
 }
 
 resource "aws_key_pair" "generated_key" {
-  key_name   = "${var.environment}-test-key"
+  key_name   = "${var.environment}-key"
   public_key = tls_private_key.ec2_key.public_key_openssh
 }
 

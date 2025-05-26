@@ -60,7 +60,7 @@ resource "aws_instance" "web" {
   vpc_security_group_ids = [aws_security_group.web_sg.id]
   key_name               = aws_key_pair.generated_key.key_name
 
-  user_data = var.user_data_file != null ? file(var.user_data_file) : null
+  # user_data = var.user_data_file != null ? file(var.user_data_file) : null
 
 
   tags = {
