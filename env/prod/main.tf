@@ -11,5 +11,5 @@ module "compute" {
   subnet_ids   = module.network.public_subnet_ids
   ami_id         = var.ami_id
   instance_type  = var.instance_type
-  user_data_file = "${path.module}/setup.sh"
+  # user_data_file = "${path.module}/setup.sh"
 }

@@ -31,35 +31,19 @@ module "compute" {
   # user_data_file = "${path.module}/setup.sh"
 }
 
-# Defines a "null_resource" in Terraform.
-# This is often used to perform provisioning steps that don't require direct resource creation.
 resource "null_resource" "wait_for_ssh" {
-
-  # Ensures this resource only executes after the "module.compute" resource has been created.
   depends_on = [module.compute]
-
-  # Uses a local-exec provisioner to run a shell command on the local machine.
   provisioner "local-exec" {
     command = <<EOT
-      # Loops up to 10 times, checking if port 22 (SSH) on the instance is open.
-      for i in {1..10}; do
-        # Uses netcat (nc) to test connectivity to the instance's public IP on port 22.
-        # If SSH is available, exits successfully (exit 0) and stops further execution.
+      for i in {1..30}; do
         nc -zv ${module.compute.instance_public_ip} 22 && exit 0
-        
-        # If SSH is not available, waits for 5 seconds before retrying.
         sleep 5
       done
-
-      # If SSH does not become available after 10 attempts, prints an error message.
       echo "Timeout waiting for SSH" >&2
-      
-      # Exits with a non-zero status code to indicate failure.
       exit 1
     EOT
   }
 }
-
 
 resource "null_resource" "ansible_provision" {
   depends_on = [null_resource.wait_for_ssh]
@@ -67,11 +51,11 @@ resource "null_resource" "ansible_provision" {
   provisioner "local-exec" {
     command = <<EOT
       export ANSIBLE_HOST_KEY_CHECKING=False
-      env=${var.environment} \
-      public_ip=${module.compute.instance_public_ip} \
-      private_key="${path.root}/../../compute/ec2/${var.environment}_test_key.pem" \
-      envsubst < ${path.root}/../../inventory.tpl > ${path.root}/../../inventory.ini
-      ansible-playbook -i ${path.root}/../../inventory.ini ${path.root}/../../nginx.yml --extra-vars "env=${var.environment}"
+      export env=${var.environment}
+      export public_ip=${module.compute.instance_public_ip}
+      export private_key="${path.root}/../../compute/ec2/${var.environment}_test_key.pem"
+      envsubst < ${path.module}/playbook/inventory.tpl > ${path.module}/playbook/inventory.ini
+      ansible-playbook -i ${path.module}/playbook/inventory.ini ${path.module}/playbook/nginx.yml --extra-vars "env=${var.environment}"
     EOT
   }
 }
