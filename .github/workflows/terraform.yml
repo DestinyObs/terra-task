@@ -1,6 +1,9 @@
 name: Terraform
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       environment:
@@ -21,12 +24,16 @@ on:
           - plan
           - apply
 
+env:
+  DEFAULT_ENVIRONMENT: 'dev'
+  DEFAULT_ACTION: 'plan'
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./env/${{ github.event.inputs.environment }}
+        working-directory: ./env/${{ github.event.inputs.environment || env.DEFAULT_ENVIRONMENT }}
     
     steps:
       - name: Checkout
@@ -48,13 +55,13 @@ jobs:
         run: terraform init
       
       - name: Terraform Validate
-        if: github.event.inputs.action == 'validate' || github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'validate' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'plan' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
         run: terraform validate
       
       - name: Terraform Plan
-        if: github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'plan' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
         run: terraform plan
       
       - name: Terraform Apply
-        if: github.event.inputs.action == 'apply'
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
         run: terraform apply -auto-approve
