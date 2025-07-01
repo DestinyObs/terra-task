@@ -32,16 +32,34 @@ on:
 
 env:
   DEFAULT_ENVIRONMENT: 'dev'
-  DEFAULT_ACTION: 'apply'
+  DEFAULT_ACTION: 'plan'
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    environment: 
+      name: ${{ github.event.inputs.environment || 'dev' }}
     defaults:
       run:
         working-directory: ./env/${{ github.event.inputs.environment || env.DEFAULT_ENVIRONMENT }}
     
     steps:
+      - name: Workflow Trigger Info
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Automatic workflow triggered by push to main branch"
+            echo "Environment: ${{ env.DEFAULT_ENVIRONMENT }}"
+            echo "Action: ${{ env.DEFAULT_ACTION }}"
+            echo ""
+            echo "This workflow requires manual approval in the Actions tab"
+            echo "Click 'Review deployments' to approve and continue"
+          else
+            echo "Manual workflow triggered"
+            echo "Environment: ${{ github.event.inputs.environment }}"
+            echo "Action: ${{ github.event.inputs.action }}"
+            echo "Confirm Apply: ${{ github.event.inputs.confirm_apply }}"
+          fi
+      
       - name: Checkout
         uses: actions/checkout@v4
       
