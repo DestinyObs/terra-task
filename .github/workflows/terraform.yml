@@ -17,16 +17,21 @@ on:
       action:
         description: 'Action'
         required: true
-        default: 'plan'
+        default: 'apply'
         type: choice
         options:
           - validate
           - plan
           - apply
+      confirm_apply:
+        description: 'Confirm apply (required for apply action)'
+        required: false
+        default: false
+        type: boolean
 
 env:
   DEFAULT_ENVIRONMENT: 'dev'
-  DEFAULT_ACTION: 'plan'
+  DEFAULT_ACTION: 'apply'
 
 jobs:
   terraform:
@@ -125,10 +130,21 @@ jobs:
           terraform validate
           echo "Pre-apply validation passed"
       
+      - name: Apply Confirmation Check
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
+        run: |
+          if [ "${{ github.event.inputs.confirm_apply }}" != "true" ]; then
+            echo "Apply confirmation required but not provided"
+            echo "Please set 'confirm_apply' to true to proceed with apply"
+            exit 1
+          fi
+          echo "Apply confirmation verified"
+      
       - name: Terraform Apply
         if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
         run: |
           echo "Applying Terraform changes..."
+          echo "Environment: ${{ github.event.inputs.environment || env.DEFAULT_ENVIRONMENT }}"
           terraform apply -auto-approve tfplan
           echo "Terraform apply completed successfully"
       
