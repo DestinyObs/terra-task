@@ -31,31 +31,37 @@ module "compute" {
   # user_data_file = "${path.module}/setup.sh"
 }
 
-resource "null_resource" "wait_for_ssh" {
-  depends_on = [module.compute]
-  provisioner "local-exec" {
-    command = <<EOT
-      for i in {1..30}; do
-        nc -zv ${module.compute.instance_public_ip} 22 && exit 0
-        sleep 5
-      done
-      echo "Timeout waiting for SSH" >&2
-      exit 1
-    EOT
-  }
-}
+# Note: SSH provisioning disabled for CI/CD pipeline
+# These resources are commented out because:
+# 1. GitHub Actions doesn't have access to SSH keys
+# 2. Security groups may not allow SSH from GitHub IPs
+# 3. Better to use user_data or EC2 instance connect for provisioning
 
-resource "null_resource" "ansible_provision" {
-  depends_on = [null_resource.wait_for_ssh]
+# resource "null_resource" "wait_for_ssh" {
+#   depends_on = [module.compute]
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       for i in {1..30}; do
+#         nc -zv ${module.compute.instance_public_ip} 22 && exit 0
+#         sleep 5
+#       done
+#       echo "Timeout waiting for SSH" >&2
+#       exit 1
+#     EOT
+#   }
+# }
 
-  provisioner "local-exec" {
-    command = <<EOT
-      export ANSIBLE_HOST_KEY_CHECKING=False
-      export env=${var.environment}
-      export public_ip=${module.compute.instance_public_ip}
-      export private_key="${path.root}/../../compute/ec2/${var.environment}_test_key.pem"
-      envsubst < ${path.module}/playbook/inventory.tpl > ${path.module}/playbook/inventory.ini
-      ansible-playbook -i ${path.module}/playbook/inventory.ini ${path.module}/playbook/nginx.yml --extra-vars "env=${var.environment}"
-    EOT
-  }
-}
+# resource "null_resource" "ansible_provision" {
+#   depends_on = [null_resource.wait_for_ssh]
+
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       export ANSIBLE_HOST_KEY_CHECKING=False
+#       export env=${var.environment}
+#       export public_ip=${module.compute.instance_public_ip}
+#       export private_key="${path.root}/../../compute/ec2/${var.environment}_test_key.pem"
+#       envsubst < ${path.module}/playbook/inventory.tpl > ${path.module}/playbook/inventory.ini
+#       ansible-playbook -i ${path.module}/playbook/inventory.ini ${path.module}/playbook/nginx.yml --extra-vars "env=${var.environment}"
+#     EOT
+#   }
+# }
