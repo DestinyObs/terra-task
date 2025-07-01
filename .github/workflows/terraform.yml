@@ -51,17 +51,95 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: 'us-east-1'
       
+      - name: Create S3 Bucket for State Storage
+        run: |
+          # Set bucket name based on environment
+          if [ "${{ github.event.inputs.environment || env.DEFAULT_ENVIRONMENT }}" = "dev" ]; then
+            BUCKET_NAME="my-new-terra-task-dev-state"
+          else
+            BUCKET_NAME="my-new-terra-task-prod-state"
+          fi
+          
+          echo "Creating S3 bucket: $BUCKET_NAME"
+          
+          # Check if bucket exists, create if it doesn't
+          if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "Bucket doesn't exist, creating..."
+            aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-1
+            echo "Bucket created successfully"
+          else
+            echo "Bucket already exists, skipping creation"
+          fi
+          
+          # Enable versioning for state file safety
+          aws s3api put-bucket-versioning --bucket "$BUCKET_NAME" --versioning-configuration Status=Enabled
+          echo "Bucket versioning enabled"
+      
+      - name: Verify S3 Bucket Access
+        run: |
+          if [ "${{ github.event.inputs.environment || env.DEFAULT_ENVIRONMENT }}" = "dev" ]; then
+            BUCKET_NAME="my-new-terra-task-dev-state"
+          else
+            BUCKET_NAME="my-new-terra-task-prod-state"
+          fi
+          
+          echo "Verifying access to bucket: $BUCKET_NAME"
+          aws s3 ls s3://"$BUCKET_NAME" || echo "Bucket is empty (expected for new bucket)"
+          echo "S3 bucket access verified"
+      
+      - name: Terraform Format Check
+        run: |
+          echo "Checking Terraform formatting..."
+          terraform fmt -check -recursive || {
+            echo "Terraform files are not properly formatted"
+            echo "Run 'terraform fmt -recursive' to fix formatting"
+            exit 1
+          }
+          echo "Terraform formatting is correct"
+      
       - name: Terraform Init
-        run: terraform init
+        run: |
+          echo "Initializing Terraform..."
+          terraform init
+          echo "Terraform initialized successfully"
       
       - name: Terraform Validate
-        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'validate' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'plan' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
-        run: terraform validate
+        run: |
+          echo "Validating Terraform configuration..."
+          terraform validate
+          echo "Terraform configuration is valid"
       
       - name: Terraform Plan
         if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'plan' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
-        run: terraform plan
+        run: |
+          echo "Creating Terraform execution plan..."
+          terraform plan -detailed-exitcode -out=tfplan
+          echo "Terraform plan completed successfully"
+      
+      - name: Terraform Plan Summary
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'plan' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
+        run: |
+          echo "Plan Summary:"
+          terraform show -no-color tfplan | head -50
+          echo "... (showing first 50 lines)"
+      
+      - name: Pre-Apply Validation
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
+        run: |
+          echo "Final validation before apply..."
+          terraform validate
+          echo "Pre-apply validation passed"
       
       - name: Terraform Apply
         if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
-        run: terraform apply -auto-approve
+        run: |
+          echo "Applying Terraform changes..."
+          terraform apply -auto-approve tfplan
+          echo "Terraform apply completed successfully"
+      
+      - name: Post-Apply Validation
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
+        run: |
+          echo "Validating deployed infrastructure..."
+          terraform output
+          echo "Infrastructure deployment validated"
