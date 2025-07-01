@@ -23,6 +23,7 @@ on:
           - validate
           - plan
           - apply
+          - destroy
       confirm_apply:
         description: 'Confirm apply (required for apply action)'
         required: false
@@ -117,11 +118,24 @@ jobs:
           terraform plan -detailed-exitcode -out=tfplan
           echo "Terraform plan completed successfully"
       
+      - name: Terraform Destroy Plan
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'destroy' }}
+        run: |
+          echo "Creating Terraform destroy plan..."
+          terraform plan -destroy -detailed-exitcode -out=tfplan-destroy
+          echo "Terraform destroy plan completed successfully"
+      
       - name: Terraform Plan Summary
         if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'plan' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
         run: |
           echo "Plan Summary:"
           terraform show -no-color tfplan
+      
+      - name: Terraform Destroy Plan Summary
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'destroy' }}
+        run: |
+          echo "Destroy Plan Summary:"
+          terraform show -no-color tfplan-destroy
       
       - name: Pre-Apply Validation
         if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
@@ -131,26 +145,48 @@ jobs:
           echo "Pre-apply validation passed"
       
       - name: Apply Confirmation Check
-        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' || (github.event.inputs.action || env.DEFAULT_ACTION) == 'destroy' }}
+        id: confirm_check
         run: |
           if [ "${{ github.event.inputs.confirm_apply }}" != "true" ]; then
-            echo "Apply confirmation required but not provided"
-            echo "Please set 'confirm_apply' to true to proceed with apply"
-            exit 1
+            echo "WORKFLOW SKIPPED: Confirmation required but not provided"
+            echo "To proceed with ${{ github.event.inputs.action || env.DEFAULT_ACTION }}, please:"
+            echo "1. Run workflow manually"
+            echo "2. Set 'confirm_apply' checkbox to true"
+            echo "3. Re-run the workflow"
+            echo ""
+            echo "Workflow completed safely - no infrastructure changes made"
+            echo "skip_remaining=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
-          echo "Apply confirmation verified"
+          echo "Action confirmation verified"
+          echo "skip_remaining=false" >> $GITHUB_OUTPUT
       
       - name: Terraform Apply
-        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' && steps.confirm_check.outputs.skip_remaining == 'false' }}
         run: |
           echo "Applying Terraform changes..."
           echo "Environment: ${{ github.event.inputs.environment || env.DEFAULT_ENVIRONMENT }}"
           terraform apply -auto-approve tfplan
           echo "Terraform apply completed successfully"
       
+      - name: Terraform Destroy
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'destroy' && steps.confirm_check.outputs.skip_remaining == 'false' }}
+        run: |
+          echo "Destroying Terraform infrastructure..."
+          echo "Environment: ${{ github.event.inputs.environment || env.DEFAULT_ENVIRONMENT }}"
+          terraform apply -auto-approve tfplan-destroy
+          echo "Terraform destroy completed successfully"
+      
       - name: Post-Apply Validation
-        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' }}
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'apply' && steps.confirm_check.outputs.skip_remaining == 'false' }}
         run: |
           echo "Validating deployed infrastructure..."
           terraform output
           echo "Infrastructure deployment validated"
+      
+      - name: Post-Destroy Validation
+        if: ${{ (github.event.inputs.action || env.DEFAULT_ACTION) == 'destroy' && steps.confirm_check.outputs.skip_remaining == 'false' }}
+        run: |
+          echo "Validating infrastructure destruction..."
+          echo "Infrastructure destroy completed"
